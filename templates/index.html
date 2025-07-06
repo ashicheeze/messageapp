@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Schedule Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 2rem 0;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 1rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            background: #f8f9fa;
+            border: none;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab:hover:not(.active) {
+            background: #e9ecef;
+        }
+        
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 10px;
+            padding: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            margin: 10px 5px;
+        }
+        
+        .btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .event-card {
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .event-card:hover {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .event-card.selected {
+            border-color: #667eea;
+            background-color: #f8f9ff;
+        }
+        
+        .event-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .event-date {
+            color: #667eea;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+        
+        .event-location {
+            color: #6c757d;
+            margin-bottom: 0.5rem;
+        }
+        
+        .event-description {
+            color: #495057;
+            line-height: 1.5;
+        }
+        
+        .event-source {
+            font-size: 0.9rem;
+            color: #6c757d;
+            font-style: italic;
+            margin-top: 0.5rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .alert {
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+        
+        .alert-success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .alert-error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            flex: 1;
+            margin: 0 0.5rem;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📅 Email Schedule Manager</h1>
+            <p class="subtitle">メールからスケジュールを自動抽出してGoogle Calendarに追加</p>
+        </header>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('fetch')">📧 メール取得</button>
+            <button class="tab" onclick="showTab('select')">✅ イベント選択</button>
+            <button class="tab" onclick="showTab('calendar')">📅 カレンダー作成</button>
+        </div>
+        
+        <!-- メール取得タブ -->
+        <div id="fetch-tab" class="tab-content active">
+            <h2>📧 メールからイベント抽出</h2>
+            <p>Gmailから最新のメールを取得し、スケジュール情報を自動抽出します。</p>
+            
+            <div class="stats" id="stats" style="display: none;">
+                <div class="stat-card">
+                    <div class="stat-number" id="email-count">0</div>
+                    <div class="stat-label">取得メール数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="event-count">0</div>
+                    <div class="stat-label">検出イベント数</div>
+                </div>
+            </div>
+            
+            <button class="btn" onclick="fetchEmails()">
+                🔄 メールを取得してイベント抽出
+            </button>
+            
+            <div id="fetch-loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>メールを取得中...</p>
+            </div>
+            
+            <div id="fetch-result"></div>
+        </div>
+        
+        <!-- イベント選択タブ -->
+        <div id="select-tab" class="tab-content">
+            <h2>✅ カレンダーに追加するイベントを選択</h2>
+            <p>検出されたイベントから、Google Calendarに追加したいものを選択してください。</p>
+            
+            <div style="margin-bottom: 1rem;">
+                <button class="btn" onclick="selectAll()">すべて選択</button>
+                <button class="btn" onclick="deselectAll()">すべて解除</button>
+                <span id="selection-count" style="margin-left: 1rem; color: #667eea; font-weight: 500;"></span>
+            </div>
+            
+            <div id="events-list">
+                <p style="color: #6c757d; text-align: center; padding: 2rem;">
+                    まず「メール取得」タブでイベントを抽出してください。
+                </p>
+            </div>
+        </div>
+        
+        <!-- カレンダー作成タブ -->
+        <div id="calendar-tab" class="tab-content">
+            <h2>📅 Google Calendarに追加</h2>
+            <p>選択したイベントをGoogle Calendarに追加します。</p>
+            
+            <button class="btn btn-success" onclick="createCalendarEvents()" id="create-btn" disabled>
+                ➕ 選択したイベントをカレンダーに追加
+            </button>
+            
+            <div id="calendar-loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>カレンダーイベントを作成中...</p>
+            </div>
+            
+            <div id="calendar-result"></div>
+        </div>
+    </div>
+
+    <script>
+        let extractedEvents = [];
+        let selectedEventIds = [];
+
+        function showTab(tabName) {
+            // すべてのタブを非アクティブに
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // 選択されたタブをアクティブに
+            document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+
+        function fetchEmails() {
+            document.getElementById('fetch-loading').style.display = 'block';
+            document.getElementById('fetch-result').innerHTML = '';
+            
+            fetch('/fetch_emails', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('fetch-loading').style.display = 'none';
+                
+                if (data.success) {
+                    extractedEvents = data.events;
+                    
+                    // 統計表示
+                    document.getElementById('stats').style.display = 'flex';
+                    document.getElementById('email-count').textContent = data.total_emails;
+                    document.getElementById('event-count').textContent = data.events.length;
+                    
+                    document.getElementById('fetch-result').innerHTML = `
+                        <div class="alert alert-success">
+                            ✅ 成功！${data.total_emails}件のメールから${data.events.length}個のイベントを抽出しました。
+                            「イベント選択」タブに移動して確認してください。
+                        </div>
+                    `;
+                    
+                    // イベント選択タブを更新
+                    updateEventsDisplay();
+                    
+                } else {
+                    document.getElementById('fetch-result').innerHTML = `
+                        <div class="alert alert-error">
+                            ❌ エラー: ${data.error}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                document.getElementById('fetch-loading').style.display = 'none';
+                document.getElementById('fetch-result').innerHTML = `
+                    <div class="alert alert-error">
+                        ❌ エラー: ${error.message}
+                    </div>
+                `;
+            });
+        }
+
+        function updateEventsDisplay() {
+            const eventsList = document.getElementById('events-list');
+            
+            if (extractedEvents.length === 0) {
+                eventsList.innerHTML = '<p style="color: #6c757d; text-align: center; padding: 2rem;">イベントが見つかりませんでした。</p>';
+                return;
+            }
+            
+            eventsList.innerHTML = extractedEvents.map(event => `
+                <div class="event-card" onclick="toggleEvent(${event.id})" id="event-${event.id}">
+                    <div class="event-title">${event.title}</div>
+                    <div class="event-date">📅 ${event.start_date}${event.start_time ? ` ${event.start_time}` : ''}${event.end_time ? ` - ${event.end_time}` : ''}</div>
+                    ${event.location ? `<div class="event-location">📍 ${event.location}</div>` : ''}
+                    <div class="event-description">${event.description}</div>
+                    <div class="event-source">📧 ${event.email_subject}</div>
+                </div>
+            `).join('');
+            
+            updateSelectionCount();
+        }
+
+        function toggleEvent(eventId) {
+            const index = selectedEventIds.indexOf(eventId);
+            const eventCard = document.getElementById(`event-${eventId}`);
+            
+            if (index > -1) {
+                selectedEventIds.splice(index, 1);
+                eventCard.classList.remove('selected');
+            } else {
+                selectedEventIds.push(eventId);
+                eventCard.classList.add('selected');
+            }
+            
+            updateSelectionCount();
+            updateCreateButton();
+        }
+
+        function selectAll() {
+            selectedEventIds = extractedEvents.map(event => event.id);
+            document.querySelectorAll('.event-card').forEach(card => card.classList.add('selected'));
+            updateSelectionCount();
+            updateCreateButton();
+        }
+
+        function deselectAll() {
+            selectedEventIds = [];
+            document.querySelectorAll('.event-card').forEach(card => card.classList.remove('selected'));
+            updateSelectionCount();
+            updateCreateButton();
+        }
+
+        function updateSelectionCount() {
+            document.getElementById('selection-count').textContent = 
+                `${selectedEventIds.length}個のイベントが選択されています`;
+        }
+
+        function updateCreateButton() {
+            const createBtn = document.getElementById('create-btn');
+            createBtn.disabled = selectedEventIds.length === 0;
+        }
+
+        function createCalendarEvents() {
+            if (selectedEventIds.length === 0) {
+                alert('イベントを選択してください。');
+                return;
+            }
+            
+            document.getElementById('calendar-loading').style.display = 'block';
+            document.getElementById('calendar-result').innerHTML = '';
+            
+            fetch('/create_events', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    selected_events: selectedEventIds
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('calendar-loading').style.display = 'none';
+                
+                if (data.success) {
+                    document.getElementById('calendar-result').innerHTML = `
+                        <div class="alert alert-success">
+                            ✅ 成功！${data.created_count}個のイベントをGoogle Calendarに追加しました。
+                            <ul style="margin-top: 1rem;">
+                                ${data.events.map(event => `<li>${event.title}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('calendar-result').innerHTML = `
+                        <div class="alert alert-error">
+                            ❌ エラー: ${data.error}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                document.getElementById('calendar-loading').style.display = 'none';
+                document.getElementById('calendar-result').innerHTML = `
+                    <div class="alert alert-error">
+                        ❌ エラー: ${error.message}
+                    </div>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>
