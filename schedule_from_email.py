@@ -1,56 +1,49 @@
 import os
-import imaplib
-import email
+import base64
 import openai
-from email.header import decode_header
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
 
 
-def fetch_seen_emails(max_count=10):
-    """Fetch a limited number of already read emails using IMAP."""
-    user = os.environ.get("EMAIL_USER")
-    password = os.environ.get("EMAIL_PASS")
-    if not user or not password:
-        raise RuntimeError("EMAIL_USER and EMAIL_PASS environment variables are required")
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
-    imap_server = os.environ.get("EMAIL_SERVER", "imap.gmail.com")
-    imap = imaplib.IMAP4_SSL(imap_server)
-    imap.login(user, password)
-    imap.select("INBOX")
 
-    status, messages = imap.search(None, 'SEEN')
-    if status != 'OK':
-        imap.close()
-        imap.logout()
-        raise RuntimeError('Failed to search mailbox')
+def build_gmail_service():
+    """Create a Gmail API service using an OAuth token file."""
+    token_file = os.environ.get('GMAIL_TOKEN_JSON')
+    if not token_file:
+        raise RuntimeError('GMAIL_TOKEN_JSON environment variable is required')
+    creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+    return build('gmail', 'v1', credentials=creds)
 
-    email_ids = messages[0].split()
+
+def _extract_body(payload):
+    if 'parts' in payload:
+        for part in payload['parts']:
+            if part.get('mimeType') == 'text/plain':
+                data = part.get('body', {}).get('data')
+                if data:
+                    return base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+        return ''
+    data = payload.get('body', {}).get('data')
+    if data:
+        return base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+    return ''
+
+
+def fetch_seen_emails(max_count=10, query=None):
+    """Fetch already read emails using the Gmail API."""
+    service = build_gmail_service()
+    q = query or os.environ.get('GMAIL_QUERY', 'label:inbox is:read')
+    result = service.users().messages().list(userId='me', q=q, maxResults=max_count).execute()
+    messages = result.get('messages', [])
     emails = []
-    for eid in email_ids[-max_count:]:
-        status, msg_data = imap.fetch(eid, '(RFC822)')
-        if status != 'OK':
-            continue
-        for response_part in msg_data:
-            if isinstance(response_part, tuple):
-                msg = email.message_from_bytes(response_part[1])
-                body = ""
-                if msg.is_multipart():
-                    for part in msg.walk():
-                        ctype = part.get_content_type()
-                        cdisp = str(part.get('Content-Disposition'))
-                        if ctype == 'text/plain' and 'attachment' not in cdisp:
-                            payload = part.get_payload(decode=True)
-                            if payload:
-                                body += payload.decode('utf-8', errors='ignore')
-                else:
-                    payload = msg.get_payload(decode=True)
-                    if payload:
-                        body = payload.decode('utf-8', errors='ignore')
-                emails.append({
-                    'subject': str(decode_header(msg['subject'])[0][0]),
-                    'body': body
-                })
-    imap.close()
-    imap.logout()
+    for msg_meta in messages:
+        msg = service.users().messages().get(userId='me', id=msg_meta['id'], format='full').execute()
+        headers = msg.get('payload', {}).get('headers', [])
+        subject = next((h['value'] for h in headers if h['name'] == 'Subject'), '')
+        body = _extract_body(msg.get('payload', {}))
+        emails.append({'subject': subject, 'body': body})
     return emails
 
 
